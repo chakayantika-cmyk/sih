@@ -18,16 +18,26 @@ interface User {
 export default function AdminDashboard() {
   const router = useRouter();
 
+  const [activeTab, setActiveTab] = useState<'logs' | 'users'>('logs');
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [users, setUsers] = useState<User[]>([]);
-  const [showModal, setShowModal] = useState(false);
+  
+  // Modals
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  
+  // Form states
   const [newUser, setNewUser] = useState({ name: '', email: '' });
-  const [addError, setAddError] = useState('');
-  const [addSuccess, setAddSuccess] = useState('');
-  const [addLoading, setAddLoading] = useState(false);
+  const [editUser, setEditUser] = useState({ name: '', email: '' });
+  
+  // Loading & Error states
+  const [errorMsg, setErrorMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
+  const [loading, setLoading] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 
-  // ── Fetch logs ────────────────────────────────────────────────────────────
+  // ── Data Fetching ─────────────────────────────────────────────────────────
+
   const fetchLogs = useCallback(async () => {
     const res = await fetch('/api/admin/logs');
     if (res.status === 401) {
@@ -41,7 +51,6 @@ export default function AdminDashboard() {
     }
   }, [router]);
 
-  // ── Fetch users ───────────────────────────────────────────────────────────
   const fetchUsers = useCallback(async () => {
     const res = await fetch('/api/admin/users');
     if (res.ok) {
@@ -53,23 +62,26 @@ export default function AdminDashboard() {
   useEffect(() => {
     fetchLogs();
     fetchUsers();
-    // Auto-refresh logs every 5 seconds
-    const interval = setInterval(fetchLogs, 5000);
+    // Only auto-poll logs when the logs tab is active to reduce flicker
+    const interval = setInterval(() => {
+      fetchLogs();
+      fetchUsers();
+    }, 5000);
     return () => clearInterval(interval);
   }, [fetchLogs, fetchUsers]);
 
-  // ── Logout ────────────────────────────────────────────────────────────────
+  // ── Actions ───────────────────────────────────────────────────────────────
+
   const handleLogout = async () => {
     await fetch('/api/admin/login', { method: 'DELETE' });
     router.push('/');
   };
 
-  // ── Add user ──────────────────────────────────────────────────────────────
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    setAddLoading(true);
-    setAddError('');
-    setAddSuccess('');
+    setLoading(true);
+    setErrorMsg('');
+    setSuccessMsg('');
 
     try {
       const res = await fetch('/api/admin/users', {
@@ -80,28 +92,77 @@ export default function AdminDashboard() {
       const data = await res.json();
 
       if (res.ok) {
-        setAddSuccess(`✅ "${newUser.name}" has been registered!`);
-        setNewUser({ name: '', email: '' });
+        setSuccessMsg(`✅ "${newUser.name}" added successfully!`);
         fetchUsers();
-        setTimeout(() => {
-          setShowModal(false);
-          setAddSuccess('');
-        }, 1800);
+        setTimeout(() => closeModals(), 1500);
       } else {
-        setAddError(data.error || 'Failed to add user.');
+        setErrorMsg(data.error || 'Failed to add user.');
       }
     } catch {
-      setAddError('Network error. Please try again.');
+      setErrorMsg('Network error.');
     } finally {
-      setAddLoading(false);
+      setLoading(false);
     }
   };
 
-  const closeModal = () => {
-    setShowModal(false);
-    setAddError('');
-    setAddSuccess('');
+  const handleEditUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: editUser.email, newName: editUser.name }),
+      });
+      
+      if (res.ok) {
+        setSuccessMsg('✅ User updated successfully!');
+        fetchUsers();
+        setTimeout(() => closeModals(), 1500);
+      } else {
+        const data = await res.json();
+        setErrorMsg(data.error || 'Failed to update user.');
+      }
+    } catch {
+      setErrorMsg('Network error.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteUser = async (email: string) => {
+    if (!confirm(`Are you sure you want to remove ${email}?`)) return;
+    
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      if (res.ok) {
+        fetchUsers();
+      } else {
+        alert('Failed to delete user.');
+      }
+    } catch {
+      alert('Network error.');
+    }
+  };
+
+  const closeModals = () => {
+    setShowAddModal(false);
+    setShowEditModal(false);
+    setErrorMsg('');
+    setSuccessMsg('');
     setNewUser({ name: '', email: '' });
+  };
+
+  const openEditModal = (user: User) => {
+    setEditUser({ name: user.name, email: user.email });
+    setShowEditModal(true);
   };
 
   return (
@@ -119,7 +180,7 @@ export default function AdminDashboard() {
 
           <div className="flex gap-3">
             <button
-              onClick={() => setShowModal(true)}
+              onClick={() => setShowAddModal(true)}
               className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
             >
               + Add User
@@ -134,132 +195,198 @@ export default function AdminDashboard() {
         </div>
       </header>
 
-      <div className="max-w-5xl mx-auto px-6 py-8 space-y-8">
-        {/* ── Stats ── */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="bg-gray-800 border border-gray-700 rounded-xl p-5">
-            <p className="text-gray-400 text-sm">Registered Users</p>
-            <p className="text-4xl font-bold text-white mt-1">{users.length}</p>
-          </div>
-          <div className="bg-gray-800 border border-gray-700 rounded-xl p-5">
-            <p className="text-gray-400 text-sm">Total Logins</p>
-            <p className="text-4xl font-bold text-white mt-1">{logs.length}</p>
-          </div>
-        </div>
-
-        {/* ── Login Activity ── */}
-        <div className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-700 flex items-center justify-between">
-            <h2 className="text-base font-semibold text-white">Login Activity</h2>
-            <span className="text-xs text-gray-500">
-              Refreshed {lastRefresh.toLocaleTimeString()} · auto every 5s
+      <div className="max-w-5xl mx-auto px-6 py-8 space-y-6">
+        
+        {/* Tabs */}
+        <div className="flex border-b border-gray-800 mb-6">
+          <button
+            onClick={() => setActiveTab('logs')}
+            className={`px-6 py-3 text-sm font-medium transition-colors ${
+              activeTab === 'logs' 
+                ? 'border-b-2 border-blue-500 text-white' 
+                : 'text-gray-500 hover:text-gray-300'
+            }`}
+          >
+            Login Activity
+          </button>
+          <button
+            onClick={() => setActiveTab('users')}
+            className={`px-6 py-3 text-sm font-medium transition-colors flex gap-2 items-center ${
+              activeTab === 'users' 
+                ? 'border-b-2 border-blue-500 text-white' 
+                : 'text-gray-500 hover:text-gray-300'
+            }`}
+          >
+            Registered Users
+            <span className="bg-gray-800 text-xs py-0.5 px-2 rounded-full border border-gray-700">
+              {users.length}
             </span>
-          </div>
-
-          {logs.length === 0 ? (
-            <div className="py-16 text-center text-gray-600">
-              <p className="text-5xl mb-3">📋</p>
-              <p className="text-sm">No login activity yet</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-gray-700/60">
-              {logs.map((log, i) => (
-                <div key={i} className="px-6 py-4 flex items-center gap-4">
-                  <div className="w-8 h-8 rounded-full bg-green-900/40 flex items-center justify-center flex-shrink-0">
-                    <span className="text-green-400 text-sm">✓</span>
-                  </div>
-                  <p className="text-sm">
-                    <span className="font-semibold text-white">{log.username}</span>
-                    <span className="text-gray-400"> logged-in at </span>
-                    <span className="text-blue-400 font-medium">{log.time}</span>
-                    <span className="text-gray-400"> </span>
-                    <span className="text-gray-300">{log.date}</span>
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
+          </button>
         </div>
+
+        {/* ── Tab: Login Activity ── */}
+        {activeTab === 'logs' && (
+          <div className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-700 flex items-center justify-between">
+              <h2 className="text-base font-semibold text-white">Recent Logins</h2>
+              <span className="text-xs text-gray-500">
+                Last refresh: {lastRefresh.toLocaleTimeString()}
+              </span>
+            </div>
+
+            {logs.length === 0 ? (
+              <div className="py-16 text-center text-gray-600">
+                <p className="text-5xl mb-3">📋</p>
+                <p className="text-sm">No login activity yet</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-700/60 max-h-[600px] overflow-y-auto">
+                {logs.map((log, i) => (
+                  <div key={i} className="px-6 py-4 flex items-center gap-4">
+                    <div className="w-8 h-8 rounded-full bg-green-900/40 flex items-center justify-center flex-shrink-0">
+                      <span className="text-green-400 text-sm">✓</span>
+                    </div>
+                    <p className="text-sm">
+                      <span className="font-semibold text-white">{log.username}</span>
+                      <span className="text-gray-400"> ({log.email}) logged-in at </span>
+                      <span className="text-blue-400 font-medium">{log.time}</span>
+                      <span className="text-gray-400"> </span>
+                      <span className="text-gray-300">{log.date}</span>
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Tab: Registered Users ── */}
+        {activeTab === 'users' && (
+          <div className="bg-gray-800 border border-gray-700 rounded-xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-700 flex items-center justify-between">
+              <h2 className="text-base font-semibold text-white">Manage Users</h2>
+            </div>
+            
+            {users.length === 0 ? (
+              <div className="py-16 text-center text-gray-600">
+                <p className="text-5xl mb-3">👥</p>
+                <p className="text-sm">No registered users</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-gray-900/50 text-gray-400">
+                    <tr>
+                      <th className="px-6 py-4 font-medium">Registered Name</th>
+                      <th className="px-6 py-4 font-medium">Registered Email</th>
+                      <th className="px-6 py-4 font-medium text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-700/60">
+                    {users.map((user, i) => (
+                      <tr key={i} className="hover:bg-gray-700/20 transition-colors">
+                        <td className="px-6 py-4 font-medium text-white">{user.name}</td>
+                        <td className="px-6 py-4 text-gray-400">{user.email}</td>
+                        <td className="px-6 py-4 text-right space-x-3">
+                          <button 
+                            onClick={() => openEditModal(user)}
+                            className="text-blue-400 hover:text-blue-300 font-medium transition-colors"
+                          >
+                            Edit
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteUser(user.email)}
+                            className="text-red-400 hover:text-red-300 font-medium transition-colors"
+                          >
+                            Remove
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
       </div>
 
       {/* ── Add User Modal ── */}
-      {showModal && (
-        <div
-          className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-          onClick={(e) => e.target === e.currentTarget && closeModal()}
-        >
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={(e) => e.target === e.currentTarget && closeModals()}>
           <div className="bg-gray-800 border border-gray-700 rounded-2xl p-8 w-full max-w-md shadow-2xl">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-bold text-white">Add New User</h2>
-              <button
-                onClick={closeModal}
-                className="text-gray-500 hover:text-white transition-colors text-xl leading-none"
-              >
-                ✕
-              </button>
-            </div>
-
+            <h2 className="text-lg font-bold text-white mb-6">Add New User</h2>
             <form onSubmit={handleAddUser} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">
-                  Full Name
-                </label>
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">Full Name</label>
                 <input
                   type="text"
                   value={newUser.name}
                   onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
-                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 transition-colors"
-                  placeholder="Enter user's full name"
+                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-1 transition-colors"
+                  placeholder="Enter name"
                   required
                 />
               </div>
-
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1.5">
-                  Email Address
-                </label>
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">Email Address</label>
                 <input
                   type="email"
                   value={newUser.email}
                   onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 transition-colors"
-                  placeholder="Enter valid email address"
+                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-1 transition-colors"
+                  placeholder="Enter email"
                   required
                 />
               </div>
-
-              {addError && (
-                <div className="bg-red-900/30 border border-red-700 rounded-lg px-4 py-3 text-red-300 text-sm">
-                  ⚠️ {addError}
-                </div>
-              )}
-
-              {addSuccess && (
-                <div className="bg-green-900/30 border border-green-700 rounded-lg px-4 py-3 text-green-300 text-sm">
-                  {addSuccess}
-                </div>
-              )}
-
+              {errorMsg && <div className="text-red-400 text-sm mt-2">{errorMsg}</div>}
+              {successMsg && <div className="text-green-400 text-sm mt-2">{successMsg}</div>}
               <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-medium py-3 rounded-lg transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={addLoading}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {addLoading ? 'Adding…' : 'Add User'}
-                </button>
+                <button type="button" onClick={closeModals} className="flex-1 bg-gray-700 text-white py-3 rounded-lg hover:bg-gray-600 transition-colors">Cancel</button>
+                <button type="submit" disabled={loading} className="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors">{loading ? 'Saving...' : 'Add User'}</button>
               </div>
             </form>
           </div>
         </div>
       )}
+
+      {/* ── Edit User Modal ── */}
+      {showEditModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={(e) => e.target === e.currentTarget && closeModals()}>
+          <div className="bg-gray-800 border border-gray-700 rounded-2xl p-8 w-full max-w-md shadow-2xl">
+            <h2 className="text-lg font-bold text-white mb-6">Edit User</h2>
+            <form onSubmit={handleEditUser} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">Email (Read Only)</label>
+                <input
+                  type="email"
+                  value={editUser.email}
+                  disabled
+                  className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 text-gray-500 cursor-not-allowed"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1.5">Full Name</label>
+                <input
+                  type="text"
+                  value={editUser.name}
+                  onChange={(e) => setEditUser({ ...editUser, name: e.target.value })}
+                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-blue-500 focus:ring-1 transition-colors"
+                  required
+                />
+              </div>
+              {errorMsg && <div className="text-red-400 text-sm mt-2">{errorMsg}</div>}
+              {successMsg && <div className="text-green-400 text-sm mt-2">{successMsg}</div>}
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={closeModals} className="flex-1 bg-gray-700 text-white py-3 rounded-lg hover:bg-gray-600 transition-colors">Cancel</button>
+                <button type="submit" disabled={loading} className="flex-1 bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors">{loading ? 'Saving...' : 'Save Changes'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </main>
   );
 }

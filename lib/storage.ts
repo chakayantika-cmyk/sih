@@ -107,6 +107,30 @@ export async function addUser(user: User): Promise<void> {
   }
 }
 
+export async function deleteUser(email: string): Promise<void> {
+  if (useRedis) {
+    const users = await getUsers();
+    delete users[email];
+    await redisSet('portal:users', users);
+  } else {
+    delete mem.users[email];
+  }
+}
+
+export async function updateUser(email: string, newName: string): Promise<void> {
+  if (useRedis) {
+    const users = await getUsers();
+    if (users[email]) {
+      users[email].name = newName;
+      await redisSet('portal:users', users);
+    }
+  } else {
+    if (mem.users[email]) {
+      mem.users[email].name = newName;
+    }
+  }
+}
+
 // ─── OTPs ─────────────────────────────────────────────────────────────────────
 
 export async function setOtp(email: string, otp: string): Promise<void> {

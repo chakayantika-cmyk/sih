@@ -57,3 +57,40 @@ export async function POST(req: NextRequest) {
     user: { name: name.trim(), email: normalizedEmail },
   });
 }
+
+// DELETE /api/admin/users – Delete a user by email
+export async function DELETE(req: NextRequest) {
+  if (!(await isAuthed())) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const body = await req.json();
+  const { email } = body;
+
+  if (!email) {
+    return NextResponse.json({ error: 'Email is required.' }, { status: 400 });
+  }
+
+  const { deleteUser } = await import('@/lib/storage');
+  await deleteUser(email.toLowerCase().trim());
+  return NextResponse.json({ success: true });
+}
+
+// PATCH /api/admin/users – Update a user's name
+export async function PATCH(req: NextRequest) {
+  if (!(await isAuthed())) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const body = await req.json();
+  const { email, newName } = body;
+
+  if (!email || !newName || newName.trim().length === 0) {
+    return NextResponse.json({ error: 'Email and valid newName are required.' }, { status: 400 });
+  }
+
+  const { updateUser } = await import('@/lib/storage');
+  await updateUser(email.toLowerCase().trim(), newName.trim());
+  return NextResponse.json({ success: true });
+}
+
