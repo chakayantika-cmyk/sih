@@ -47,19 +47,24 @@ const mem = {
 
 // ─── Detect Redis availability ────────────────────────────────────────────────
 
-const useRedis = !!(
-  process.env.UPSTASH_REDIS_REST_URL &&
-  process.env.UPSTASH_REDIS_REST_TOKEN
-);
+// Find the REST URL and Token from environment variables (handles Vercel KV, Upstash, and prefixed vars)
+const restUrlKey = Object.keys(process.env).find(k => k.endsWith('KV_REST_API_URL') || k.endsWith('UPSTASH_REDIS_REST_URL'));
+const restTokenKey = Object.keys(process.env).find(k => k.endsWith('KV_REST_API_TOKEN') || k.endsWith('UPSTASH_REDIS_REST_TOKEN'));
+
+const redisUrl = restUrlKey ? process.env[restUrlKey] : undefined;
+const redisToken = restTokenKey ? process.env[restTokenKey] : undefined;
+
+const useRedis = !!(redisUrl && redisToken);
 
 // Lazily initialised Redis client — avoids crashing when env vars are absent
 let _redis: Redis | null = null;
 
 function getRedis(): Redis {
   if (!_redis) {
+    if (!redisUrl || !redisToken) throw new Error("Redis credentials missing");
     _redis = new Redis({
-      url: process.env.UPSTASH_REDIS_REST_URL!,
-      token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+      url: redisUrl,
+      token: redisToken,
     });
   }
   return _redis;
