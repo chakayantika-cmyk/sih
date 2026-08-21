@@ -36,7 +36,9 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (storedOtp !== String(otp)) {
+  // Upstash Redis automatically parses numeric strings into actual Numbers.
+  // We must convert it back to a string before using strict inequality (!==).
+  if (String(storedOtp) !== String(otp)) {
     return NextResponse.json(
       { error: 'Incorrect OTP. Please try again.' },
       { status: 400 }
