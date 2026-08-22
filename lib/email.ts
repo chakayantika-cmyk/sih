@@ -65,71 +65,26 @@ export async function sendOtpEmail(
     // Plain-text fallback
     text: `Hello ${name},\n\nYour One-Time Password for Security Portal is: ${otp}\n\nThis OTP is valid for 10 minutes.\n\nIf you did not request this, please ignore this email.`,
     // HTML email
-    html: `<!DOCTYPE html>
-<html lang="en">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background-color:#0f172a;font-family:Arial,Helvetica,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" role="presentation"
-         style="background-color:#0f172a;padding:40px 16px;">
-    <tr>
-      <td align="center">
-        <table width="500" cellpadding="0" cellspacing="0" role="presentation"
-               style="background-color:#1e293b;border-radius:16px;overflow:hidden;
-                      border:1px solid #334155;">
-
-          <!-- Header -->
-          <tr>
-            <td style="background:linear-gradient(135deg,#1d4ed8,#2563eb);
-                        padding:28px 32px;text-align:center;">
-              <p style="margin:0;font-size:28px;">🔐</p>
-              <h1 style="margin:8px 0 0;color:#ffffff;font-size:20px;
-                          font-weight:700;letter-spacing:0.5px;">
-                Security Portal
-              </h1>
-            </td>
-          </tr>
-
-          <!-- Body -->
-          <tr>
-            <td style="padding:36px 32px;">
-              <p style="margin:0 0 8px;color:#94a3b8;font-size:15px;">
-                Hello, <strong style="color:#f1f5f9;">${name}</strong>
-              </p>
-              <p style="margin:0 0 28px;color:#94a3b8;font-size:15px;">
-                Here is your One-Time Password to log in:
-              </p>
-
-              <!-- OTP Box -->
-              <div style="background:#0f172a;border:2px solid #3b82f6;
-                           border-radius:12px;padding:24px;text-align:center;
-                           margin-bottom:28px;">
-                <span style="font-size:56px;font-weight:800;color:#60a5fa;
-                              letter-spacing:20px;font-family:'Courier New',monospace;">
-                  ${otp}
-                </span>
-              </div>
-
-              <p style="margin:0;color:#64748b;font-size:13px;text-align:center;">
-                ⏱ This OTP expires in <strong style="color:#94a3b8;">10 minutes</strong>.
-                Do not share it with anyone.
-              </p>
-            </td>
-          </tr>
-
-          <!-- Footer -->
-          <tr>
-            <td style="padding:16px 32px;border-top:1px solid #334155;text-align:center;">
-              <p style="margin:0;color:#475569;font-size:12px;">
-                If you didn't request this OTP, you can safely ignore this email.
-              </p>
-            </td>
-          </tr>
-
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`,
+    html: `
+      <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+        <div style="background-color: #1e3a8a; padding: 24px; text-align: center;">
+          <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 600;">Security Portal</h1>
+        </div>
+        <div style="padding: 32px;">
+          <p style="color: #374151; font-size: 16px; margin-top: 0;">Hi <strong>${name}</strong>,</p>
+          <p style="color: #4b5563; font-size: 15px; line-height: 1.5;">We received a request to log in to your account. Your One-Time Password (OTP) is below:</p>
+          
+          <div style="background-color: #f3f4f6; padding: 24px; margin: 32px 0; border-radius: 8px; text-align: center; border: 1px dashed #cbd5e1;">
+            <span style="font-size: 36px; font-weight: 700; letter-spacing: 12px; color: #1e40af; font-family: monospace;">${otp}</span>
+          </div>
+          
+          <p style="color: #4b5563; font-size: 14px; margin-bottom: 8px;">⏱️ This code is valid for <strong>10 minutes</strong>.</p>
+          <p style="color: #ef4444; font-size: 14px; margin-top: 0;">If you didn't request this code, you can safely ignore this email.</p>
+        </div>
+        <div style="background-color: #f9fafb; padding: 16px; text-align: center; border-top: 1px solid #e5e7eb;">
+          <p style="color: #9ca3af; font-size: 12px; margin: 0;">&copy; ${new Date().getFullYear()} Security Portal. All rights reserved.</p>
+        </div>
+      </div>
+    `,
   });
 }
