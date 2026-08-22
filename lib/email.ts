@@ -49,11 +49,19 @@ export async function sendOtpEmail(
   otp: string
 ): Promise<void> {
   const transporter = getTransporter();
+  const domain = process.env.GMAIL_USER?.split('@')[1] || 'gmail.com';
+  const messageId = `<${Date.now()}-${Math.random().toString(36).substring(2)}@${domain}>`;
 
   await transporter.sendMail({
     from: `"Security Portal" <${process.env.GMAIL_USER}>`,
+    replyTo: process.env.GMAIL_USER,
     to,
-    subject: `🔐 Your OTP is ${otp} – Security Portal`,
+    subject: `Your OTP is ${otp} - Security Portal`,
+    messageId: messageId,
+    headers: {
+      'X-Priority': '1 (Highest)',
+      'X-Mailer': 'Nodemailer',
+    },
     // Plain-text fallback
     text: `Hello ${name},\n\nYour One-Time Password for Security Portal is: ${otp}\n\nThis OTP is valid for 10 minutes.\n\nIf you did not request this, please ignore this email.`,
     // HTML email
